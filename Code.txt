@@ -1,0 +1,206 @@
+  #include <Wire.h>
+#include<LiquidCrystal_I2C.h>
+LiquidCrystal_I2C lcd(0x27,16,2);
+
+int waterPin=10;
+
+#define Red 4
+#define green 5
+#define Buzzer 6
+int turbidityPin = A0;  // Pin connected to the sensor
+int threshold = 700;    // Threshold value for clean water
+
+#include <SoftwareSerial.h>
+#include <Wire.h>
+
+#define RE 8
+#define DE 7
+
+const byte nitro[] = {0x01,0x03, 0x00, 0x1e, 0x00, 0x01, 0xe4, 0x0c};
+const byte phos[] = {0x01,0x03, 0x00, 0x1f, 0x00, 0x01, 0xb5, 0xcc};
+const byte pota[] = {0x01,0x03, 0x00, 0x20, 0x00, 0x01, 0x85, 0xc0};
+
+byte values[11];
+
+SoftwareSerial mod(2, 3);
+
+void setup() {
+  // put your setup code here, to run once:
+  Serial.begin(9600);
+ lcd.clear();
+ lcd.init();
+ lcd.backlight();
+ lcd.setCursor(2,0);
+ lcd.print("Hello  would");
+
+ lcd.setCursor(3,1);
+ lcd.print("welcome");      // Turn on the LCD backlight
+  
+  pinMode(turbidityPin, INPUT);  // Set turbidity sensor pin as input
+
+  lcd.setCursor(0, 0);
+  lcd.print("Water Quality:");
+  delay(1000);
+  pinMode(Red,OUTPUT);
+  pinMode(green,OUTPUT);
+  pinMode(Buzzer,OUTPUT);
+  pinMode(waterPin,INPUT);  
+
+    // Set the baud rate for the SerialSoftware object
+  mod.begin(9600);
+
+  // Define pin modes for RE and DE
+  pinMode(RE, OUTPUT);
+  pinMode(DE, OUTPUT);
+  
+  delay(500);
+  lcd.clear();
+}
+
+void loop() {
+  // put your main code here, to run repeatedly:
+  digitalWrite(green,HIGH);
+  Soil_Sensor();
+  Turbidity();
+  npk();
+}
+
+void npk(){
+
+  byte val1,val2,val3;
+  val1 = nitrogen();
+  delay(250);
+  val2 = phosphorous();
+  delay(250);
+  val3 = potassium();
+  delay(250);
+  lcd.setCursor(0,1);
+  lcd.print("N ");
+  lcd.setCursor(2,1);
+  lcd.print(val1);
+  lcd.setCursor(6,1);
+  lcd.print("P ");
+    lcd.setCursor(12,1);
+  lcd.print("k ");
+  lcd.setCursor(8,1);
+  lcd.print(val2);
+  lcd.setCursor(13,1);
+  lcd.print(val3);
+//  delay(1000);
+//  lcd.clear();
+
+  // Print values to the serial monitor
+  Serial.print("Nitrogen: ");
+  Serial.print(val1);
+  Serial.println(" mg/kg");
+  Serial.print("Phosphorous: ");
+  Serial.print(val2);
+  Serial.println(" mg/kg");
+  Serial.print("Potassium: ");
+  Serial.print(val3);
+  Serial.println(" mg/kg");
+  
+}
+
+
+void Soil_Sensor(){
+  int Water=digitalRead(waterPin);
+Serial.println(Water);
+int waterMap=map(Water,1,0,0,1);
+
+if(waterMap==1){
+   lcd.setCursor(0,0);
+  lcd.print("S=mois");
+  digitalWrite(Buzzer,LOW);
+  digitalWrite(Red,LOW);
+}
+else if(waterMap==0){
+     lcd.setCursor(0,0);
+  lcd.print("S=dry ");
+  digitalWrite(Buzzer,HIGH);
+  digitalWrite(Red,HIGH);
+  delay(500);
+    digitalWrite(Buzzer,LOW);
+  digitalWrite(Red,LOW);
+  delay(500);
+    digitalWrite(Buzzer,HIGH);
+  digitalWrite(Red,HIGH);
+  delay(500);
+    digitalWrite(Buzzer,LOW);
+  digitalWrite(Red,LOW);
+  delay(500);
+}
+}// end of water sensor
+
+
+
+void Turbidity(){
+  int sensorValue = analogRead(turbidityPin);  // Read the sensor value
+  float voltage = sensorValue * (5.0 / 1023.0);  // Convert the analog reading to voltage
+
+  Serial.print("Turbidity Sensor Value: ");
+  Serial.print(sensorValue);
+  Serial.print("\tVoltage: ");
+  Serial.println(voltage);
+
+  lcd.setCursor(0, 1);
+  if (sensorValue < 680) {
+    lcd.setCursor(8,0);
+    lcd.print("notclean");  // Print "Not Clean" if the water is not clean
+  } else {
+    lcd.setCursor(8,0);
+    lcd.print(" Clean     ");  // Print "Clean" if the water is clean
+  }
+}
+
+
+byte nitrogen(){
+  digitalWrite(DE,HIGH);
+  digitalWrite(RE,HIGH);
+  delay(10);
+  if(mod.write(nitro,sizeof(nitro))==8){
+    digitalWrite(DE,LOW);
+    digitalWrite(RE,LOW);
+    for(byte i=0;i<7;i++){
+    //Serial.print(mod.read(),HEX);
+    values[i] = mod.read();
+    Serial.print(values[i],HEX);
+    }
+    Serial.println();
+  }
+  return values[4];
+}
+ 
+byte phosphorous(){
+  digitalWrite(DE,HIGH);
+  digitalWrite(RE,HIGH);
+  delay(10);
+  if(mod.write(phos,sizeof(phos))==8){
+    digitalWrite(DE,LOW);
+    digitalWrite(RE,LOW);
+    for(byte i=0;i<7;i++){
+    //Serial.print(mod.read(),HEX);
+    values[i] = mod.read();
+    Serial.print(values[i],HEX);
+    }
+    Serial.println();
+  }
+  return values[4];
+}
+ 
+byte potassium(){
+  digitalWrite(DE,HIGH);
+  digitalWrite(RE,HIGH);
+  delay(10);
+  if(mod.write(pota,sizeof(pota))==8){
+    digitalWrite(DE,LOW);
+    digitalWrite(RE,LOW);
+    for(byte i=0;i<7;i++){
+    //Serial.print(mod.read(),HEX);
+    values[i] = mod.read();
+    Serial.print(values[i],HEX);
+    }
+    Serial.println();
+  }
+  return values[4];
+}
